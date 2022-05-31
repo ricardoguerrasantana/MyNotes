@@ -20,5 +20,8 @@
   "bugs": {
     "url": "https://github.com/ricardoguerrasantana/MyNotes/issues"
   },
-  "homepage": "https://github.com/ricardoguerrasantana/MyNotes#readme"
+  "homepage": "https://github.com/ricardoguerrasantana/MyNotes#readme",
+  "dependencies": {
+    "express": "^4.18.1"
+  }
 }
