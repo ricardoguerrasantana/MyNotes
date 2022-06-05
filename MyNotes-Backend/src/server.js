@@ -1,46 +1,97 @@
-import express from 'express'
+import express from "express"
 import bodyParser from "body-parser"
-
-// Fake data base
-const notes = {
-    passwords: {
-        updates: 0,
-        items: [],
-    },
-    birthdays: {
-        updates: 0,
-        items: [],
-    },
-    "account-numbers": {
-        updates: 0,
-        items: [],
-    },
-}
+import { MongoClient } from "mongodb"
 
 const app = express()
 
 app.use(bodyParser.json())
 
-app.post("/notes/:title/update", (req, res) => {
-    const { title } = req.params
-    notes[title].updates += 1
+// Set up the database and pass down a callback to perform operations on it.
+const withDatabase = async (operations, res) => {
+    try {
+        // Connection URI
+        const uri = "mongodb://localhost:27017"
+        const db = "my-notes"
+        // Create a new MongoClient
+        const client = new MongoClient(uri)
+        // Connect the client to the server
+        await client.connect()
+        // Retrieve specified database from client
+        const database = client.db(db)
+        // Callback that contains all the operations to perform on the database
+        await operations(database)
 
-    res.status(200).send(
-        `${title} note is been updated ${
-            notes[title].updates === 1
-                ? `${notes[title].updates} time.`
-                : `${notes[title].updates} time(s).`
-        }`
-    )
+        client.close()
+    } catch (error) {
+        res.status(500).json({ message: "Error connecting to db", error })
+    }
+}
+
+// Setup a collection and pass down a callback to perform operations on it.
+const withCollection = async (operations, res, collectionName) => {
+    // Callback that retrieve an specified collection from the given database,
+    // and pass down a callback to perform operations on this collection.
+    const collectionOperation = async (database) => {
+        // Retrieve specified collection from database
+        const collection = database.collection(collectionName)
+        // Callback that contains operations to perform on retrieved collection
+        await operations(collection)
+    }
+    // Insert operations to perform on the database
+    await withDatabase(collectionOperation, res)
+}
+
+// Setup notes collection and pass down a callback to perform operations on it.
+const withNotesCollection = async (operations, res) => {
+    // Provided operations are now redefined as notes collection specific operations.
+    const notesCollectionOperations = operations
+    // Specify collection to work with and insert operations to perform on it.
+    await withCollection(notesCollectionOperations, res, "notes")
+}
+
+// GET request - Retrieve a note by title
+app.get("/api/notes/:title", async (req, res) => {
+    const { title } = req.params
+    // Callback to define all the operations to perform on notes collection
+    const notesCollectionOperations = async (collection) => {
+        const note = await collection.findOne({ title })
+
+        res.status(200).json(note)
+    }
+    // Perform operations on notes collection
+    await withNotesCollection(notesCollectionOperations, res)
 })
 
-app.post("/notes/:id/add-item", (req, res) => {
-    const id = req.params.id
-    const { item } = req.body
-    notes[id].items.push(item)
+// Retrieve all notes
+app.get("/api/notes", async (req, res) => {
+    withNotesCollection(async (collection) => {
+        const notes = await collection.find({})
 
-    res.status(200).send(notes[id])
+        res.status(200).json(notes)
+    }, res)
+})
+
+app.post("/api/notes/:title/update", async (req, res) => {
+    const { title } = req.params
+
+    withNotesCollection(async (collection) => {
+        const note = await collection.findOne({ title })
+
+        await collection.updateOne(
+            { title },
+            {
+                $set: {
+                    updates: note.updates + 1,
+                },
+            }
+        )
+
+        const updatedNote = await collection.findOne({ title })
+        res.status(200).json(updatedNote)
+    }, res)
 })
 
 const port = 8000
-app.listen(port, () => {console.log(`Listening on port ${port}`)})
+app.listen(port, () => {
+    console.log(`Listening on port ${port}`)
+})
