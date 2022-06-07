@@ -70,22 +70,23 @@ app.get("/api/notes", async (req, res) => {
         res.status(200).json(notes)
     }, res)
 })
-
-app.post("/api/notes/:title/update", async (req, res) => {
+// POST request - Update lines note by title
+app.post("/api/notes/:title", async (req, res) => {
     const { title } = req.params
+    const { historyLines } = req.body
 
     withNotesCollection(async (collection) => {
         const note = await collection.findOne({ title })
 
-        await collection.updateOne(
-            { title },
-            {
-                $set: {
-                    updates: note.updates + 1,
-                },
-            }
-        )
-
+        if (historyLines) {
+            await collection.updateOne(
+                { title },
+                {
+                    $set: { historyLines: note.historyLines.concat(historyLines) },
+                }
+            )
+        }
+        
         const updatedNote = await collection.findOne({ title })
         res.status(200).json(updatedNote)
     }, res)
