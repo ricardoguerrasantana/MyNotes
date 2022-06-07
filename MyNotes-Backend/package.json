@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ricardoguerrasantana/MyNotes.git"
+    "url": "git+https://github.com/ricardoguerrasantana/MyNotes.git"
   },
   "keywords": [
     "Node.js",
